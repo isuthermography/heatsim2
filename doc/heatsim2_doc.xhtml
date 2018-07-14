@@ -1,0 +1,338 @@
+<html xmlns:html="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>heatsim2</title>
+    <style type="text/css"><![CDATA[
+
+    body {
+      counter-reset: counth2;
+    }
+    h1  {
+      counter-reset: counth2;
+
+    }
+    h2:before {
+      content: counter(counth2) ".\0000a0\0000a0";
+      counter-increment: counth2;
+    }
+    h2 {
+      counter-reset: counth3;
+    }
+    h3:before {
+      content: counter(counth2) "." counter(counth3) ".\0000a0\0000a0";
+      counter-increment: counth3;
+    }
+
+
+    td {
+      vertical-align: top; 
+    }
+]]></style>
+  </head>
+  <body>
+    <h1>Heatsim2</h1>
+    <h2>Introduction</h2>
+    <p>
+      Heatsim2 is a finite difference simulator for heat conduction.
+      It is designed to let you define the grid and boundary
+      conditions from Python, while implementing the calculations
+      using optimized C code. It uses an alternating direction
+      implicit (ADI) Crank- Nicholson solver. It can simulate anisotropic
+      materials so long as the anisotropy is aligned to the simulation
+      axes. It can also simulate thin (in z) specimens that have
+      curvature along the x and/or y axes.       
+    </p>
+    <h2>Tutorial</h2>
+    This tutorial parallels the <tt>testheatsim2.py</tt> example in the <tt>demos/</tt> directory.
+    <h3>Grid initialization</h3>
+    <p>
+      The first step is to define the grid over which heatsim2 will
+      peform the finite difference calculations. This means defining
+      the number of steps in the z, y, and x axes (if you want only
+      a 2D or 1D calculation you can set the number of steps
+      in one or more axis to 1). You also need to define the bounds of
+      the region. Here the region will be bounded in z at 0 and 1.4 mm,
+      bounded in y from -1.6mm to +1.6mm, and bounded in x at -1.5mm to +1.5mm.
+      Then you can use the
+      <tt>heatsim2.build_grid()</tt> function to define the grid point
+      centers and grid point boundaries:
+    </p>
+    <pre>
+nz=5
+ny=50
+nx=55
+
+(dz,dy,dx,
+ z,y,x,
+ zgrid,ygrid,xgrid,
+ z_bnd,y_bnd,x_bnd,
+ z_bnd_z,z_bnd_y,z_bnd_x,
+ y_bnd_z,y_bnd_y,y_bnd_x,
+ x_bnd_z,x_bnd_y,x_bnd_x,
+ r3d,r2d) = heatsim2.build_grid(0,1.4e-3,nz,
+                                -1.6e-3,1.6e-3,ny,
+                                -1.5e-3,1.5e-3,nx)
+    </pre>
+    <p>
+      The variables <tt>dz</tt>, <tt>dy</tt>, and <tt>dx</tt> represent 
+      the resulting axis step sizes. The variables <tt>z</tt>, <tt>y</tt>, and <tt>x</tt> are one-dimensional arrays of coordinates of the grid centers.
+      The variables <tt>z_bnd</tt>, <tt>y_bnd</tt>, and <tt>x_bnd</tt> are one-dimensional arrays of coordinates of the grid boundaries.
+      In this example, <tt>z_bnd</tt> is <tt>[ 0, .28e-3, .56e-3, .84e-3, 1.12e-3, 1.4e-3 ]</tt>, representing the 6 boundaries of the 5 <tt>z</tt> grid elements. Likewise <tt>z</tt> is <tt>[ .14e-3, 42e-3, .7e-3, .98e-3, 1.26e-3 ]</tt> representing the midpoints of those grid elements. Note that if you want to guarantee an element centered at the origin, you should have symmetric spatial bounds and an odd number of elements in each axis.
+    </p>
+    <p>
+      The variables <tt>zgrid</tt>, <tt>ygrid</tt>, and <tt>xgrid</tt>
+      represent the <tt>z</tt>, <tt>y</tt>, and <tt>x</tt> grid cell center
+      coordinates, but shaped and broadcasted over a <tt>nz</tt>
+      by <tt>ny</tt> by <tt>nx</tt> array. These are useful for evaluating
+      distances and conditions. For example <tt>np.sqrt(xgrid**2 + ygrid**2 + zgrid**2)</tt> would calculate a three dimensional array of grid cell
+      center distances from the origin. Similarly <tt>xgrid > 1e-3</tt> is a
+      three-dimensional array of truth values representing which cells have
+      centers with x coordinates greater than 1 mm.
+    </p>
+    <p>
+      The variables <tt>z_bnd_z</tt>, <tt>z_bnd_y</tt>, and <tt>z_bnd_x</tt>
+      are similar shaped and broadcasted arrays representing the coordinates
+      of the centers of the cell boundaries along the z axis. They are 
+      <tt>nz+1</tt>
+      by <tt>ny</tt> by <tt>nx</tt> arrays and will be used in defining
+      boundary conditions along the z axis. Likewise <tt>y_bnd_z</tt>, <tt>y_bnd_y</tt>, and <tt>y_bnd_x</tt> are <tt>(nz,ny+1,nx)</tt> arrays representing the coordinates of the centers of the y axis cell boundaries, and <tt>x_bnd_z</tt>, <tt>x_bnd_y</tt>, and <tt>x_bnd_x</tt> are <tt>(nz,ny,nx+1)</tt> arrays representing the coordinates of the centers of the x axis cell boundaries.
+    </p>
+    <p>
+      Finally <tt>r3d</tt> is a precalculated 3 dimensional array representing the distances of cell centers from the origin, and <tt>r2d</tt> is a precalculated 3 dimensional array representing the distance projected into the x-y plane of cell centers from the origin. 
+    </p>
+    <h3>Defining material classes</h3>
+    <pre>
+# define materials:
+#titanium_k=6.7 # W/m/deg K
+titanium_k=np.diag(np.array((6.7,6.7,6.7),dtype='d'))
+titanium_rho=4.43e3 # W/m/deg K
+titanium_c=526.3 # J/kg/deg K
+
+materials=(
+    # material 0: titanium
+    (heatsim2.TEMPERATURE_COMPUTE,titanium_k,titanium_rho,titanium_c),
+    # material 1: Titanium, fixed temperature (Dirichlet boundary condition)
+    (heatsim2.TEMPERATURE_FIXED,),
+)
+    </pre>
+    <p>
+      Any number of materials can be defined. Every cell in your grid
+      will need to have a material identified. They will be identified by their
+    index into the <tt>materials</tt> tuple. Each material is defined by
+    a nested tuple. The first element can be <tt>heatsim2.TEMPERATURE_FIXED</tt>
+    which will inhibit any calculations causing temperature changes for
+    the material, or <tt>heatsim2.TEMPERATURE_COMPUTE</tt>. If the latter
+    then three more elements of the tuple should be given: The material
+    thermal conductivity (k), density (rho), and specific heat (c).
+    The thermal conductivity may be either a scalar (for an isotropic
+    material) or a diagonal matrix (to represent anisotropy aligned
+    with the coordinate axes). The commented <tt>titanium_k</tt> line
+    above specifies would use the isotropic model, whereas the
+    uncommented line would use the anisotropic model (with, admittedly,
+    isotropic parameters).
+    </p>
+    <h3> Defining boundary classes </h3>
+    <pre>
+boundaries=(
+    # boundary 0: conducting
+    #(heatsim2.boundary_conducting,),
+    (heatsim2.boundary_conducting_anisotropic,),
+    (heatsim2.boundary_insulating,),
+)
+    </pre>
+    <p>
+    Similar to defining materials, a <tt>boundaries</tt> tuple must
+    be specified. Every x, y, and z boundary between every grid element
+    (including both internal and external boundaries) will need
+    to be specified. Boundary classes will be identified by their index into the
+    <tt>boundaries</tt> tuple. Each boundary class is specified by a python object or
+    module that has <tt>qz()</tt>, <tt>qy()</tt>, and <tt>qx()</tt>
+    callables. Additional elements in the boundary class tuple
+    will be passed as additional parameters to the callables.
+    The built-in boundary class modules are: <tt>heatsim2.boundary_insulating</tt>, <tt>heatsim2.boundary_conducting</tt>, <tt>heatsim2.boundary_conducting_anisotropic</tt>, and <tt>heatsim2.boundary_thininsulatinglayer</tt>. If you defined materials anisotropically, then you must use <tt>heatsim2.boundary_conducting_anisotropic</tt> in place of <tt>heatsim2.boundary_conducting</tt> for all
+    of the internal boundaries. 
+    </p>
+    <h3> Defining volumetric heat source classes </h3>
+    <pre>
+volumetric=(  # on material grid
+    # 0: nothing
+    (heatsim2.NO_SOURCE,),
+    #1: impulse source @ t=0
+    (heatsim2.IMPULSE_SOURCE,0.0,10e3/dz), # t (sec), Energy J/m^2
+)
+    </pre>
+    <p>
+      You must also define any volumetric heat source classes you will need.
+      This works similarly to the material and boundary classes.
+      Possible identifiers are <tt>heatsim2.NO_SOURCE</tt>,
+      <tt>heatsim2.IMPULSE_SOURCE</tt> (an impulse in time; parameters are the time for the impulse -- must <i>exactly</i> match a given timestep --, and the source energy in J/m^3),
+      <tt>heatsim2.STEPPED_SOURCE</tt> (a stepped source; parameters are start time, end time, and intensity in Watts/m^3),
+      <tt>heatsim2.IMPULSE_POINT_SOURCE_JOULES</tt> (an impulse in time, first parameter is the exact time, second parameter is energy specified in Joules into each element, which may be a scalar or a volumetric array),
+      <tt>heatsim2.SPATIALLY_Z_DECAYING_TEMPORAL_IMPULSE</tt> (see comments/code in alternatingdirection_c_pyx.pyx for details),
+    </p>
+    <h3>Specifying material, boundary, and volumetric arrays</h3>
+    <pre>
+# initialize all elements to zero
+(material_elements,
+ boundary_z_elements,
+ boundary_y_elements,
+ boundary_x_elements,
+ volumetric_elements)=heatsim2.zero_elements(nz,ny,nx) 
+
+delam_depth=0.4e-3; 
+delam_min_x=-1e-3
+delam_max_x=1e-3
+delam_min_y=-.6e-3
+delam_max_y=.6e-3
+
+boundary_z_elements[ (z_bnd_x &gt; delam_min_x) &amp;
+                     (z_bnd_x &lt; delam_max_x) &amp;
+                     (z_bnd_y &gt; delam_min_y) &amp;
+                     (z_bnd_y &lt; delam_max_y) &amp;
+                     (z_bnd_z==z_bnd[(np.abs(z_bnd-delam_depth)).argmin()])]=1 # set edges to insulating
+boundary_x_elements[:,:,0]=1 # insulating
+boundary_x_elements[:,:,-1]=1 # insulating
+boundary_y_elements[:,0,:]=1 # insulating
+boundary_y_elements[:,-1,:]=1 # insulating
+boundary_z_elements[0,:,:]=1 # insulating
+boundary_z_elements[-1,:,:]=1 # insulating
+
+volumetric_elements[0,:,:]=1  # impulse
+
+    </pre>
+    <p>
+      Calling <tt>heatsim2.zero_elements(nz,ny,nx)</tt> returns
+      empty grids initialized to zero for specifying the
+      material, the z, y, and x boundaries, and the volumetric
+      sources (the material and volumetric sources are shaped <tt>(nz,ny,nx)</tt>
+      whereas <tt>boundary_z_elements</tt> is shaped <tt>(nz+1,ny,nx)</tt>,
+      <tt>boundary_y_elements</tt> is shaped <tt>(nz,ny+1,nx)</tt>, etc. 
+    </p>
+    <p>
+      In this case all of the <tt>material_elements</tt> are left at
+      zero because there is only one material and all cells should be
+      calculated.  The outer boundaries of the simulation volume are
+      all set to insulating (boundary index 1) rather than the
+      pre-initialized index 0 because otherwise the simulation will
+      attempt to reference cells outside the volume and fail.
+    </p>
+    <p>
+      This simulation represents a flash thermography test in the x-y
+      plane of a specimen with a "delamination" (how titanium could ever delaminate is
+      left as an exercise to the reader) at a depth of 0.4 mm with
+      extent between +/- 1 mm in x and between +/- 0.6 mm in y.
+      This delamination will be represented as rectangular region of
+      internal z boundaries that are represented as insulating
+      (index 1) rather than conducting (index 0). 
+      Thus the z boundary elements at the closest z boundary to
+      0.4 mm and within these specified x and y bounds are set to
+      1 (defined as <tt>boundary_insulating</tt>
+    </p>
+    <p>
+      The flash thermography excitation is represented by the
+      top layer (z=0) of <tt>volumetric_elements</tt> being set to 1,
+      selecting the #1 element of <tt>volumetric</tt> which
+      specifies a 10 kJ/m^2 source. Note that we will need to be
+      sure to provide a timestep at exactly t=0 in order for this
+      source to operate correctly. Also note that the source is being
+      represented as volumetric heating throughout the top layer, as
+      opposed to the idealized behavior of a perfect impulse applied
+      to the top boundary. 
+    </p>
+    <h3>Definition of time range</h3>
+    <pre>
+t0=0
+dt=0.010
+nt=200
+
+tvec=t0+np.arange(nt,dtype='d')*dt
+    </pre>
+    <p>
+      You need to define the times at which the the calculation should
+      be performed, a range of times with consistent spacing <tt>dt</tt>.
+      The timestep must be small enough to avoid convergence problems
+      (because heatsim2 uses an implicit method you can use significantly
+      larger timesteps than with explicit methods). 
+      These times must line up exactly with times specified for special
+      boundary conditions such as <tt>heatsim2.IMPULSE_SOURCE</tt>. Note
+      that these times are for the <i>center time</i> of the calculation.
+      Each timestep (width <tt>dt</tt>) goes from t<sub>center</sub>-dt/2
+      to t<sub>center</sub>+dt/2. The initial values of temperature T
+      that you provide to the simulation are assumed to correspond to
+      values at t0-dt/2. Then the first update to that (from the first
+      call to <tt>run_adi_steps</tt> is best interpreted as the temperatures
+      at t=t0+dt/2. <b>The output temperatures are defined not at the
+	given timesteps but are shifted by dt/2!</b>
+    </p>
+    <h3>Initializing the solver</h3>
+    <pre>
+(ADI_params,ADI_steps)=heatsim2.setup(z[0],y[0],x[0],
+                                      dz,dy,dx,
+                                      nz,ny,nx,
+                                      dt,
+                                      materials,
+                                      boundaries,
+                                      volumetric,
+                                      material_elements,
+                                      boundary_z_elements,
+                                      boundary_y_elements,
+                                      boundary_x_elements,
+                                      volumetric_elements)
+    </pre>
+    <p>
+      Call <tt>heatsim2.setup()</tt> as shown to initialize the solver. This step defines the equations that will be iterated to perform the finite difference calculations. There are two optional paramters, <tt>top_surface_y_curvatures</tt> and <tt>top_surface_x_curvatures</tt> which can additionally be supplied to represent the curvature of the surface corresponding to the smallest z index. They should be arrays over x and y (coordinates from <tt>(xygrid_y,xygrid_x) = np.meshgrid(y,x,indexing='ij')</tt>) representing curvatures along the y and x axes respectively, positive concave. The thickness should always be less than 1/maximum_curvature.
+    </p>
+    <h3>Iterating the solver</h3>
+    <pre>
+T=np.zeros((nt,nz,ny,nx),dtype='d')
+curtemp=np.zeros((nz,ny,nx),dtype='d');
+for tcnt in range(nt):
+    t=t0+dt*tcnt
+    print("t=%f" % (t))
+    curtemp=heatsim2.run_adi_steps(ADI_params,ADI_steps,t,dt,curtemp,volumetric_elements,volumetric)
+    T[tcnt,::]=curtemp
+    pass
+    </pre>
+    <p>
+      You need to define an arrays, <tt>T</tt> and <tt>curtemp</tt> in this example, to store the current temperature and/or time history. This
+      example initializes the time history <tt>T</tt> and last timestep
+      temperature field <tt>curtemp</tt> to 0.
+      Call <tt>heatsim2.run_adi_steps()</tt> to evaluate the temperature
+      at a new timestep from the temperature at the previous timestep.
+      The parameters to <tt>run_adi_steps()</tt> should match the parameters and results from <tt>heatsim2.setup()</tt> except the value of <tt>t</tt> should be incremented by <tt>dt</tt> from the previous value. 
+    </p>
+    <h3>Plotting the results</h3>
+    <pre>
+pl.figure(1)
+pl.clf()
+pl.imshow(T[20,0,:,:],origin='lower',extent=(x_bnd[0]*1e3,x_bnd[-1]*1e3,y_bnd[0]*1e3,y_bnd[-1]*1e3))
+pl.ylabel('Y position (mm)')
+pl.xlabel('X position (mm)')
+pl.title('Surface temperature increase (deg. C) at t=%f' % (tvec[20]+dt))
+pl.colorbar()
+
+pl.figure(2)
+pl.clf()
+pl.loglog(tvec+dt/2.0,T[:,0,20,21])
+pl.grid()
+pl.xlabel('Time (s)')
+pl.ylabel('Surface temp. increase (deg. C)')
+pl.title('Temperature vs. time at x=%f mm, y=%f mm' % (x[21]*1e3,y[20]*1e3))
+
+pl.show()
+    </pre>
+    <p>
+      Matplotlib can be used to plot the results. Please note
+      that the times of the calculation output are offset by 1/2
+      timestep compared to the times of the calculation itself.
+    </p>
+    <img src="tutorial_fig1.png"/><br/>
+    <img src="tutorial_fig2.png"/><br/>
+    <h3>Interpreting the results</h3>
+    <ul>
+      <li>There is a temperature increase over the delamination</li>
+      <li>The temperature-time plot shows equilibriation starting
+	at around .3 seconds. The early time behavior (flattening before t=.07 s) is an artifact of the z discretization and is addressed by finer z step sizes. </li>
+      
+    </ul>
+  </body>
+</html>
