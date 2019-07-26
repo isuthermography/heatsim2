@@ -158,7 +158,26 @@ class linear_expression(object):
         return res
         #raise NotImplementedError("... Use multiplication by reciprocal")
 
+    def __truediv__(self,param):
+        res=linear_expression()
+        arg=linear_expression(param)
+        res.le_cmdlist.extend(self.le_cmdlist)
+        res.le_cmdlist.extend(arg.le_cmdlist)
+        res.le_cmdlist.append((self.OP_DIV,None))
+        res.finalize()
+        return res
+
     def __rdiv__(self,param):
+        res=linear_expression()
+        arg=linear_expression(param)
+        res.le_cmdlist.extend(arg.le_cmdlist)
+        res.le_cmdlist.extend(self.le_cmdlist)
+        res.le_cmdlist.append((self.OP_DIV,None))
+        res.finalize()
+        return res
+        #raise NotImplementedError("... Use multiplication by reciprocal")
+
+    def __rtruediv__(self,param):
         res=linear_expression()
         arg=linear_expression(param)
         res.le_cmdlist.extend(arg.le_cmdlist)
