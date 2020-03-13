@@ -183,7 +183,7 @@ T=np.zeros((nt+1,nz,ny,nx),dtype='d')
 T_nofoam=np.zeros((nt+1,nz,ny,nx),dtype='d')
 for tcnt in range(nt):
     t=t0+dt*tcnt
-    print "t=%f" % (t)
+    print("t={}".format(t))
     T[tcnt+1,::]=heatsim2.run_adi_steps(ADI_params,ADI_steps,t,dt,T[tcnt,::],volumetric_elements,volumetric)
     T_nofoam[tcnt+1,::]=heatsim2.run_adi_steps(ADI_params_nofoam,ADI_steps_nofoam,t,dt,T_nofoam[tcnt,::],volumetric_elements,volumetric)
     pass

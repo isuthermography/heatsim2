@@ -256,7 +256,7 @@ if run_heatsim2 and run_coarse:
     heatsim2meas=np.zeros(nt_heatsim2,dtype='d')
     for tcnt in range(nt_heatsim2):
         curt=t0+dt_heatsim2*tcnt
-        print "t=%f" % (curt)
+        print("t={}".format(curt))
         T=heatsim2.run_adi_steps(ADI_params,ADI_steps,curt,dt_heatsim2,T,volumetric_elements,volumetric)
         heatsim2meas[tcnt]=T[0,measj,measi] # note: heatsim array is transposed compared with new standard
 
@@ -285,7 +285,7 @@ if run_heatsim and run_coarse:
     for tcnt in range(nt_heatsim):
         curt=t0+dt_heatsim*tcnt
         if tcnt % 100 == 0:
-            print("t=%f" % (curt))
+            print("t={}".format(curt))
             pass
         heatsim.stepforward(sim,curt)
         heatsimmeas[tcnt]=sim.array[measi,measj,0] # note: heatsim array is transposed compared with new standard
@@ -325,7 +325,7 @@ if run_heatsim2 and run_fine:
 
     for tcnt in range(nt_heatsim2_fine):
         curt=t0+dt_heatsim2_fine*tcnt
-        print "t=%f" % (curt)
+        print("t=%f".format(curt))
         T_fine=heatsim2.run_adi_steps(ADI_params_fine,ADI_steps_fine,curt,dt_heatsim2_fine,T_fine,volumetric_elements_fine,volumetric_fine)
         heatsim2meas_fine[tcnt]=T_fine[0,measj_fine,measi_fine] # note: heatsim array is transposed compared with new standard
 
