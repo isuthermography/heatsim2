@@ -130,7 +130,7 @@ volumetric_elements[0,:,:]=1  # impulse
 T=np.zeros((nt,nz,ny,nx),dtype='d')
 for tcnt in range(nt-1):
     t=t0+dt*tcnt
-    print "t=%f" % (t)
+    print("t={}".format(t))
     T[tcnt+1,::]=heatsim2.run_adi_steps(ADI_params,ADI_steps,t,dt,T[tcnt,::],volumetric_elements,volumetric)
     pass
 

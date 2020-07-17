@@ -104,7 +104,7 @@ T=np.zeros((nt,nz,ny,nx),dtype='d')
 curtemp=np.zeros((nz,ny,nx),dtype='d');
 for tcnt in range(nt):
     t=t0+dt*tcnt
-    print("t=%f" % (t))
+    print("t={}".format(t))
     curtemp=heatsim2.run_adi_steps(ADI_params,ADI_steps,t,dt,curtemp,volumetric_elements,volumetric)
     T[tcnt,::]=curtemp
     pass

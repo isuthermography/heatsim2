@@ -115,7 +115,8 @@ class adi_params(object):
     
 varnamere=re.compile(r"""T([4-6])([4-6])([4-6])([pm]?)(\d*)""")
 
-
+# pyadi_step is not an extension class therefore use __del__
+# to ensure destruction
 class pyadi_step(object):
     ADI_params=None
     
@@ -140,7 +141,6 @@ class pyadi_step(object):
         cdef int cinvpermuteorder[3]
         cdef adi_step *c_step
 
-                
         self.ADI_params=ADI_params
 
         (cshape[0],cshape[1],cshape[2])=ADI_params.shape
@@ -166,7 +166,7 @@ class pyadi_step(object):
 
         pass
 
-    def __dealloc__(self):
+    def __del__(self):
         cdef adi_step *c_step 
 	#c_step=<adi_step *>PyCObject_AsVoidPtr(self.c_step)
         c_step=<adi_step *>CObject_Or_Capsule_AsVoidPtr(self.c_step);
