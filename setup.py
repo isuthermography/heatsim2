@@ -1,6 +1,12 @@
 import sys
+import os
+import os.path
+import re
+from setuptools import find_packages,setup
 from Cython.Build import cythonize
-
+from setuptools.command.install_lib import install_lib
+import distutils.spawn
+import subprocess
 from numpy.distutils.core import setup as numpy_setup, Extension as numpy_Extension
   
 #heatsim2=numpy_Extension('heatsim',sources=['heatsim.c'],extra_compile_args=['-fopenmp'],extra_link_args=['-lgomp'])
@@ -27,7 +33,7 @@ if os.path.exists(".git") and distutils.spawn.find_executable("git") is not None
     # Check if tree has been modified
     modified = subprocess.call(["git","diff-index","--quiet","HEAD","--"]) != 0
     
-    gitrev = subprocess.check_output(["git","rev-parse","HEAD"]).strip()
+    gitrev = subprocess.check_output(["git","rev-parse","HEAD"]).strip().decode('utf-8')
 
     version = "git-%s" % (gitrev)
 
