@@ -1,3 +1,5 @@
+import sys
+import os.path
 import numpy as np
 # import hs2_indexing
 
@@ -13,6 +15,24 @@ import heatsim2.boundary_thininsulatinglayer as boundary_thininsulatinglayer
 import heatsim2.alternatingdirection_c_pyx
 import heatsim2.alternatingdirection_c_pyx as alternatingdirection
 import heatsim2.crank_nicolson
+
+class dummy(object):
+    pass
+
+pkgpath = sys.modules[dummy.__module__].__file__
+pkgdir=os.path.split(pkgpath)[0]
+
+versionpath = os.path.join(pkgdir,"version.txt")
+if os.path.exists(versionpath):
+    versionfh = open(versionpath,"r")
+    __version__=versionfh.read().strip()
+    versionfh.close()
+    pass
+else:
+    __version__="UNINSTALLED"
+    pass
+
+
 
 setup=heatsim2.crank_nicolson.setup
 #run_adi_steps=heatsim2.alternatingdirection.run_adi_steps
