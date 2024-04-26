@@ -205,7 +205,8 @@ class pyadi_step(object):
         
         
         add_equation(c_step,cposindex,eqvarnames,<double *>eqvals.data,len(eqkeys))
-                     
+
+        free(eqvarnames)
         
 
     def finalize(self):
